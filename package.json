@@ -20,5 +20,8 @@
   "homepage": "https://github.com/igorantun/ep-redes#readme",
   "devDependencies": {
     "nodemon": "2.0.6"
+  },
+  "dependencies": {
+    "websocket": "1.0.32"
   }
 }
