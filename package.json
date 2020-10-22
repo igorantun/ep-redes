@@ -5,7 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/app.js"
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
   },
   "repository": {
     "type": "git",
@@ -16,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/igorantun/ep-redes/issues"
   },
-  "homepage": "https://github.com/igorantun/ep-redes#readme"
+  "homepage": "https://github.com/igorantun/ep-redes#readme",
+  "devDependencies": {
+    "nodemon": "2.0.6"
+  }
 }

@@ -1,26 +1,34 @@
 const http = require('http')
 
-http.createServer((request, response) => {
-  if (request.method === 'POST' && request.url === '/echo') {
+const server = http.createServer((req, res) => {
+  console.log(`${req.method} request received at ${req.url}`)
+
+  if (req.method === 'POST' && req.url === '/echo') {
     let body = []
 
-    request.on('error', (err) => {
+    req.on('error', (err) => {
       console.error(err)
     }).on('data', (chunk) => {
       body.push(chunk)
     }).on('end', () => {
       body = Buffer.concat(body).toString()
-      response.end(body)
+      return res.end(body)
     })
-  } else if (request.method === 'GET' && request.url === '/') {
-    response.statusCode = 200
-    response.setHeader('Content-Type', 'application/json')
-    response.write(JSON.stringify({
+  }
+
+  if (req.method === 'GET' && req.url === '/') {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/json')
+    res.write(JSON.stringify({
       hello: 'world',
     }))
-    response.end()
-  } else {
-    response.statusCode = 404
-    response.end()
+    return res.end()
   }
-}).listen(3000)
+
+  res.statusCode = 404
+  return res.end()
+})
+
+server.listen(3000, () => {
+  console.log(`🚀 Server ready at :3000`)
+})
