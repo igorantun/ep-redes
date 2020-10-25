@@ -67,7 +67,7 @@ const isBetInvalid = (bet) => {
 
 const server = http.createServer(async (req, res) => {
   console.log(`${now()} - ${req.method} request received at ${req.url}`)
-  
+
   if (req.method === 'POST' && req.url === '/bet') {
     await req.on('data', (chunk) => {
       const bet = JSON.parse(chunk)
@@ -83,20 +83,7 @@ const server = http.createServer(async (req, res) => {
       res.statusCode = 200
       return res.end('bet made.')
     })
-    
-  }
 
-  if (req.method === 'POST' && req.url === '/echo') {
-    let body = []
-
-    req.on('error', (err) => {
-      console.error(err)
-    }).on('data', (chunk) => {
-      body.push(chunk)
-    }).on('end', () => {
-      body = Buffer.concat(body).toString()
-      return res.end(body)
-    })
   }
 
   if (req.url === '/') {
