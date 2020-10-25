@@ -1,6 +1,11 @@
 const http = require('http')
 const webSocket = require('websocket').server
 const fs = require('fs')
+const { v4: uuid } = require('uuid')
+const CronJob = require('cron').CronJob;
+const raffles = require('./raffles');
+const bets = {}
+const connections = new Map()
 
 let page, client
 
@@ -12,9 +17,74 @@ fs.readFile('src/client.js', (err, data) => {
   client = data
 })
 
-const server = http.createServer((req, res) => {
-  console.log(`${req.method} request received at ${req.url}`)
+const now = () => new Date().toISOString()
 
+const hasDuplicates = (numbers) => {
+  return (new Set(numbers)).size !== numbers.length;
+}
+
+const sendMessageToClient = (userId, type, content) => {
+  const client = connections.get(userId)
+    if (client) {
+      client.send(JSON.stringify({
+        ...content,
+        type,
+      }))
+    }
+}
+
+const sendBetAnnouncementToAllClients = (raffle) => {
+  connections.forEach((client, userId) => {
+    sendMessageToClient(userId, 'bet-made', { raffle })
+  })
+}
+
+const isBetInvalid = (bet) => {
+  if (!bet.userId) {
+    return true
+  }
+  if (!bet.raffle || !raffles[bet.raffle]) {
+    sendMessageToClient(bet.userId, 'bet-error', {
+      message: 'Sorteio inexistente',
+    })
+    return true
+  }
+  if (!bet.numbers || bet.numbers.length !== raffles[bet.raffle].choices) {
+    sendMessageToClient(bet.userId, 'bet-error', {
+      message: 'Quantidade de números inválida',
+    })
+    return true
+  }
+  if (hasDuplicates(bet.numbers)) {
+    sendMessageToClient(bet.userId, 'bet-error', {
+      message: 'Números duplicados',
+    })
+    return true
+  }
+  return false
+}
+
+
+const server = http.createServer(async (req, res) => {
+  console.log(`${now()} - ${req.method} request received at ${req.url}`)
+  
+  if (req.method === 'POST' && req.url === '/bet') {
+    await req.on('data', (chunk) => {
+      const bet = JSON.parse(chunk)
+      if (isBetInvalid(bet)) {
+        console.log(`${now()} - invalid bet made`)
+        res.statusCode = 400
+        return res.end('invalid bet.')
+      }
+      console.log(`${now()} - bet made in ${bet.raffle}`)
+      bets[bet.raffle].push(bet)
+      console.log()
+      sendBetAnnouncementToAllClients(bet.raffle)
+      res.statusCode = 200
+      return res.end('bet made.')
+    })
+    
+  }
 
   if (req.method === 'POST' && req.url === '/echo') {
     let body = []
@@ -61,18 +131,77 @@ const getContentOfMessage = (message) => {
 
 webSocketServer.on('request', (req) => {
   const connection = req.accept(null, req.origin)
+  const connectionId = uuid()
+  connections.set(connectionId, connection)
+  sendMessageToClient(connectionId, 'user-id', { userId: connectionId })
 
-  console.log(`${connection.remoteAddress} connected.`)
+  console.log(`${now()} - ${connection.remoteAddress} connected.`)
 
   connection.on('message', (message) => {
     console.log(getContentOfMessage(message))
   })
 
   connection.on('close', () => {
-    console.log(`${connection.remoteAddress} disconnected.`)
+    console.log(`${now()} - ${connection.remoteAddress} disconnected.`)
   })
 })
 
 server.listen(3000, () => {
   console.log(`🚀 Server ready at :3000`)
 })
+
+const drawNumbers = ({ range, draws }) => {
+  const numbers = []
+  while(numbers.length < draws){
+    var r = Math.floor(Math.random() * range[1]) + range[0]
+    if(!numbers.includes(r)) numbers.push(r)
+  }
+  return numbers
+}
+
+const countBetHits = (draw, bet) => {
+  let hits = 0
+  for (const n of bet) {
+    if (draw.includes(n)) [
+      hits++
+    ]
+  }
+  return hits
+}
+
+const givePrizes = (raffle, draw, bets) => {
+  for (const bet of bets) {
+    const hits = countBetHits(draw, bet.numbers)
+    if (raffle.prize[hits] > 0) {
+      console.log(`${now()} - ${bet.userId} - won ${raffle.prize[hits]} (${hits}/${raffle.draws})- ${raffle.name}`)
+      sendMessageToClient(bet.userId, 'bet-win', {
+        raffle,
+        draw,
+        bet,
+        prize: raffle.prize[hits],
+      })
+    }
+  }
+}
+
+const createRaffle = (raffle) => new CronJob(raffle.interval, function() {
+  const draw = drawNumbers(raffle)
+  if (!bets[raffle.name] || bets[raffle.name].length < 1) {
+    console.log(`${now()} - no bets in ${raffle.name}`)
+    return
+  }
+  console.log(`${now()} - ${raffle.name} (${bets[raffle.name].length} bets) - ${draw}`)
+  givePrizes(raffle, draw, bets[raffle.name])
+  bets[raffle.name] = []
+}, null, true, 'America/Sao_Paulo')
+
+const startRaffles = () => {
+  const onGoingRaffles = {}
+  for (const [name, raffle] of Object.entries(raffles)) {
+    bets[name] = []
+    onGoingRaffles[name] = createRaffle(raffle)
+    onGoingRaffles[name].start()
+  }
+}
+
+startRaffles()

@@ -22,6 +22,8 @@
     "nodemon": "2.0.6"
   },
   "dependencies": {
+    "cron": "1.8.2",
+    "uuid": "8.3.1",
     "websocket": "1.0.32"
   }
 }
