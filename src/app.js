@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
 
   if (req.url === '/') {
     res.writeHead(200, {
-      'Content-Type': 'text/html',
+      'Content-Type': 'text/html; charset=utf-8',
       'Content-Length': page.length
     })
     res.write(page)
@@ -40,7 +40,7 @@ const server = http.createServer((req, res) => {
 
   if (req.url === '/client.js') {
     res.writeHead(200, {
-      'Content-Type': 'text/html',
+      'Content-Type': 'text/html; charset=utf-8',
       'Content-Length': client.length
     })
     res.write(client)

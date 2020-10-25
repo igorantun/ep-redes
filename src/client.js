@@ -1,6 +1,5 @@
 const ws = new WebSocket('ws://localhost:3000')
 
-
 const wsTest = () => {
   ws.send(JSON.stringify({
     message: 'test',
@@ -27,14 +26,14 @@ ws.onclose = () => {
 const raffles = {
   megasena: {
     name: 'Mega-Sena',
-    description: 'A loteria que paga milhoes.',
+    description: 'A loteria que paga milhões.',
     bets: 6,
     numbers: 60,
     cost: 4.5,
     prize: 'R$ 45.000.000',
   },
   lotofacil: {
-    name: 'Lotofacil',
+    name: 'Lotofácil',
     description: 'Mais chances de ganhar.',
     bets: 15,
     numbers: 25,
@@ -43,7 +42,7 @@ const raffles = {
   },
   lotomania: {
     name: 'Lotomania',
-    description: 'Facil de ganhar e apostar.',
+    description: 'Fácil de ganhar e apostar.',
     bets: 50,
     numbers: 100,
     cost: 2.5,
@@ -158,7 +157,7 @@ const generateLottery = (lottery) => {
         </div>
         <div class="col-md-6 text-right">
           <h5 class="card-title">${raffles[lottery].prize}</h5>
-          <h6 class="card-subtitle text-muted"><small>PREMIO MAXIMO</small></h6>
+          <h6 class="card-subtitle text-muted"><small>PRÊMIO MÁXIMO</small></h6>
         </div>
       </div>
       </div>
