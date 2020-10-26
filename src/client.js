@@ -1,44 +1,6 @@
-const ws = new WebSocket(`ws://${location.host}`)
-
 let userId
 
-ws.onopen = () => {
-  $('#status').removeClass('badge-warning')
-  $('#status').addClass('badge-success')
-  $('#status').text('Conectado')
-}
-
-ws.onclose = () => {
-  $('#status').removeClass('badge-success')
-  $('#status').addClass('badge-warning')
-  $('#status').text('Desconectado')
-}
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data)
-  console.log(data)
-
-  switch (data.type) {
-    case 'user-id':
-      userId = data.userId
-      break
-
-    case 'bet-made':
-      showToast('Nova aposta', `Alguém apostou na ${data.raffle}!`)
-      break
-
-    case 'bet-error':
-      showToast('Erro', data.message)
-      break
-
-    case 'bet-win':
-      const numbers = data.bet.numbers.join(', ')
-      const draw = data.draw.join(', ')
-      showToast('Você ganhou!', `Você acertou os números sorteados pela ${data.raffle.name}!<br>Seu prêmio: <b>${formatCurrency(data.prize)}</b><br>Sua aposta: ${numbers}<br>Números sorteados: ${draw}`)
-      break
-  }
-}
-
+// Regras de negócio de cada sorteio
 const raffles = {
   megasena: {
     name: 'Mega-Sena',
@@ -74,6 +36,7 @@ const raffles = {
   }
 }
 
+// Apostas feitas pelo usuário
 const bets = {
   megasena: [],
   lotofacil: [],
@@ -81,16 +44,20 @@ const bets = {
   rapidinha: [],
 }
 
+// Carrinho
 const cart = {
   total: 0,
   bets: [],
 }
 
-const showToast = (title, body) => {
+// Funções auxiliares
+const sortAscending = (array) => array.sort((a, b) => a - b) // Ordena números de forma crescente
+const formatCurrency = (amount) => amount.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'}) // Formata valores monetários
+const showToast = (title, body, delay = 5000) => { // Exibe notificação na tela
   const toastId = Date.now()
 
   $('#toast-container').append(`
-    <div id="${toastId}" class="toast" data-delay="5000">
+    <div id="${toastId}" class="toast" data-delay="${delay}">
       <div class="toast-header">
         <strong id="toast-header" class="mr-auto">${title}</strong>
         <button type="button" class="ml-2 mb-1 close" data-dismiss="toast">&times;</button>
@@ -102,49 +69,46 @@ const showToast = (title, body) => {
   $(`#${toastId}`).toast('show')
 }
 
-const startTime = new Date()
-let megasenaProgress = (startTime.getHours() * 60 * 60) + (startTime.getMinutes() * 60) + startTime.getSeconds()
-let lotofacilProgress = (startTime.getMinutes() * 60) + startTime.getSeconds()
-let lotomaniaProgress = ((startTime.getMinutes() % 5) * 60) + startTime.getSeconds()
-let rapidinhaProgress = startTime.getSeconds()
+// Websocket
+const ws = new WebSocket(`ws://${location.host}`)
 
-const updateProgress = () => {
-  const now = new Date()
-  const secondsUntilNextMinute = (60 - now.getSeconds())
-  const minutesUntilNextHour = (60 - now.getMinutes())
-  const minutesUntilNextLotomania = now.getMinutes() % 5 === 0 ? (5 - (now.getMinutes() % 5)) - 1 : (5 - (now.getMinutes() % 5))
-  const hoursUntilNextDay = (24 - now.getHours())
-  megasenaProgress++
-  lotofacilProgress++
-  lotomaniaProgress++
-  rapidinhaProgress++
-  if (megasenaProgress % (60 * 60 * 24) === 0) megasenaProgress = 0
-  if (lotofacilProgress % (60 * 60) === 0) lotofacilProgress = 0
-  if (lotomaniaProgress % (60 * 5) === 0) lotomaniaProgress = 0
-  if (rapidinhaProgress % 60 === 0) rapidinhaProgress = 0
-
-  const megasenaPercentage = megasenaProgress / (60 * 60 * 24) * 100
-  $('#megasena-progress').css('width', `${megasenaPercentage}%`).attr('aria-valuenow', megasenaPercentage);
-  $('#megasena-timer').text(`Próximo sorteio em ${hoursUntilNextDay} horas, ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
-
-  const lotofacilPercentage = lotofacilProgress / (60 * 60) * 100
-  $('#lotofacil-progress').css('width', `${lotofacilPercentage}%`).attr('aria-valuenow', lotofacilPercentage);
-  $('#lotofacil-timer').text(`Próximo sorteio em ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
-
-  const lotomaniaPercentage = lotomaniaProgress / (60 * 5) * 100
-  $('#lotomania-progress').css('width', `${lotomaniaPercentage}%`).attr('aria-valuenow', lotomaniaPercentage);
-  $('#lotomania-timer').text(`Próximo sorteio em ${minutesUntilNextLotomania} minutos e ${secondsUntilNextMinute} segundos`)
-
-  const rapidinhaPercentage = rapidinhaProgress / 60 * 100
-  $('#rapidinha-progress').css('width', `${rapidinhaPercentage}%`).attr('aria-valuenow', rapidinhaPercentage);
-  $('#rapidinha-timer').text(`Próximo sorteio em ${secondsUntilNextMinute} segundos`)
+ws.onopen = () => {
+  $('#status').removeClass('badge-warning')
+  $('#status').addClass('badge-success')
+  $('#status').text('Conectado')
 }
 
-setInterval(updateProgress, 1000)
-updateProgress()
+ws.onclose = () => {
+  $('#status').removeClass('badge-success')
+  $('#status').addClass('badge-warning')
+  $('#status').text('Desconectado')
+}
 
-const formatCurrency = (amount) => amount.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data)
 
+  switch (data.type) {
+    case 'user-id':
+      userId = data.userId
+      break
+
+    case 'bet-made':
+      showToast('Nova aposta', `Alguém apostou na ${data.raffle}!`)
+      break
+
+    case 'bet-error':
+      showToast('Erro', data.message)
+      break
+
+    case 'bet-win':
+      const numbers = sortAscending(data.bet.numbers).join(', ')
+      const draw = sortAscending(data.draw).join(', ')
+      showToast('Você ganhou!', `Você acertou os números sorteados pela ${data.raffle.name}!<br>Seu prêmio: <b>${formatCurrency(data.prize)}</b><br>Sua aposta: ${numbers}<br>Números sorteados: ${draw}`, 30000)
+      break
+  }
+}
+
+// Função que finaliza e confirma as apostas realizadas
 const placeBets = async () => {
   for (const lottery in bets) {
     if (bets[lottery].length === raffles[lottery].bets) {
@@ -160,7 +124,7 @@ const placeBets = async () => {
       })
 
       if (response.status === 200) {
-        const numbers = bets[lottery].join(', ')
+        const numbers = sortAscending(bets[lottery]).join(', ')
         showToast('Sucesso', `Você apostou na ${lottery}<br>Seus números: <b>${numbers}</b><br>Boa sorte :)`)
       }
     }
@@ -169,12 +133,14 @@ const placeBets = async () => {
   clearBets()
 }
 
+// Função que limpa as apostas feitas anteriormente
 const clearBets = () => {
   cart.bets = []
   bets.megasena = []
   bets.lotofacil = []
   bets.lotomania = []
   bets.rapidinha = []
+
   updateCart()
   cart.total = 0
   $('#total').text(`Total: ${formatCurrency(cart.total)}`)
@@ -187,44 +153,42 @@ const clearBets = () => {
   }
 }
 
+// Função que atualiza os itens e valor total do carrinho
 const updateCart = () => {
-  const cartElement = document.getElementById('cart')
-  const totalElement = document.getElementById('total')
-  const finishElement = document.getElementById('finish')
-
   for (const lottery in bets) {
     if (bets[lottery].length === raffles[lottery].bets) {
       if (!cart.bets.find(bet => bet === lottery)) {
         cart.bets.push(lottery)
-
         cart.total = cart.total + raffles[lottery].cost
-        cartElement.insertAdjacentHTML('beforeend', `
+
+        $('#cart').append(`
           <small id="${lottery}-cart"><p class="card-text">1x ${raffles[lottery].name} | ${formatCurrency(raffles[lottery].cost)}</p></small>
         `)
       }
     } else {
       cart.bets = cart.bets.filter(bet => bet !== lottery)
 
-      const lotteryCartElement = document.getElementById(`${lottery}-cart`)
-      if (lotteryCartElement) {
+      if ($(`#${lottery}-cart`).length) {
         cart.total = cart.total - raffles[lottery].cost
-        document.getElementById(`${lottery}-cart`).outerHTML = ''
+        $(`#${lottery}-cart`).remove()
       }
     }
   }
 
-  totalElement.innerHTML = `Total: ${formatCurrency(cart.total)}`
-  finishElement.disabled = !cart.bets.length
+  $('#total').text(`Total: ${formatCurrency(cart.total)}`)
+  $('#finish').prop('disabled', !cart.bets.length)
 }
 
+// Função que desabilita ou reabilita os números da aposta
 const updateCheckmarks = (lottery, disable) => {
-  $(`[id^=${lottery}-number-]`).each((_, e) => {
-    e.disabled = disable ? !e.checked : false
+  $(`[id^=${lottery}-number-]`).each((_, checkbox) => {
+    checkbox.disabled = disable ? !checkbox.checked : false
   })
 }
 
+// Função que registra a escolha de um número
 const checkNumber = (lottery, id) => {
-  const checkbox = document.getElementById(id)
+  const checkbox = $(`#${id}`)[0]
 
   if (checkbox.checked) {
     bets[lottery] = [...bets[lottery], checkbox.value]
@@ -243,6 +207,7 @@ const checkNumber = (lottery, id) => {
   updateCart()
 }
 
+// Função que adiciona os checkboxes de opções de números dinamicamente
 const generateCheckboxes = (lottery, numbers) => {
   let html = ''
 
@@ -260,10 +225,9 @@ const generateCheckboxes = (lottery, numbers) => {
   return html
 }
 
+// Função que adiciona as opções de loterias dinamicamente
 const generateLottery = (lottery) => {
-  const lotteriesElement = document.getElementById('lotteries')
-
-  lotteriesElement.insertAdjacentHTML('beforeend', `
+  $('#lotteries').append(`
     <div class="card">
       <div class="card-header">
         <div class="row">
@@ -290,8 +254,7 @@ const generateLottery = (lottery) => {
     <br>
   `)
 
-  const numbers = document.getElementById(`${lottery}-numbers`)
-  numbers.innerHTML = generateCheckboxes(lottery, raffles[lottery].numbers)
+  $(`#${lottery}-numbers`).html(generateCheckboxes(lottery, raffles[lottery].numbers))
 }
 
 for (const lottery in raffles) {

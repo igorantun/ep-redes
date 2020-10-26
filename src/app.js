@@ -7,7 +7,7 @@ const raffles = require('./raffles');
 const bets = {}
 const connections = new Map()
 
-let page, client
+let page, client, timers
 
 fs.readFile('src/index.html', (err, data) => {
   page = data
@@ -15,6 +15,10 @@ fs.readFile('src/index.html', (err, data) => {
 
 fs.readFile('src/client.js', (err, data) => {
   client = data
+})
+
+fs.readFile('src/timers.js', (err, data) => {
+  timers = data
 })
 
 const now = () => new Date().toISOString()
@@ -106,6 +110,15 @@ const server = http.createServer(async (req, res) => {
       'Content-Length': client.length,
     })
     res.write(client)
+    res.end()
+  }
+
+  if (req.url === '/timers.js') {
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Length': timers.length,
+    })
+    res.write(timers)
     res.end()
   }
 
