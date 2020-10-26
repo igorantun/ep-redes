@@ -1,15 +1,6 @@
-const ws = new WebSocket('ws://localhost:3000')
+const ws = new WebSocket(`ws://${location.host}`)
 
-const wsTest = () => {
-  ws.send(JSON.stringify({
-    message: 'test',
-  }))
-}
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data)
-  console.log(data)
-}
+let userId
 
 ws.onopen = () => {
   $('#status').removeClass('badge-warning')
@@ -21,6 +12,31 @@ ws.onclose = () => {
   $('#status').removeClass('badge-success')
   $('#status').addClass('badge-warning')
   $('#status').text('Desconectado')
+}
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data)
+  console.log(data)
+
+  switch (data.type) {
+    case 'user-id':
+      userId = data.userId
+      break
+
+    case 'bet-made':
+      showToast('Nova aposta', `Alguém apostou na ${data.raffle}!`)
+      break
+
+    case 'bet-error':
+      showToast('Erro', data.message)
+      break
+
+    case 'bet-win':
+      const numbers = data.bet.numbers.join(', ')
+      const draw = data.draw.join(', ')
+      showToast('Você ganhou!', `Você acertou os números sorteados pela ${data.raffle.name}!<br>Seu prêmio: <b>${formatCurrency(data.prize)}</b><br>Sua aposta: ${numbers}<br>Números sorteados: ${draw}`)
+      break
+  }
 }
 
 const raffles = {
@@ -70,11 +86,101 @@ const cart = {
   bets: [],
 }
 
+const showToast = (title, body) => {
+  const toastId = Date.now()
+
+  $('#toast-container').append(`
+    <div id="${toastId}" class="toast" data-delay="5000" data-autohide="true">
+      <div class="toast-header">
+        <strong id="toast-header" class="mr-auto">${title}</strong>
+        <button type="button" class="ml-2 mb-1 close" data-dismiss="toast">&times;</button>
+      </div>
+      <div id="toast-body" class="toast-body">${body}</div>
+    </div>
+  `)
+
+  $(`#${toastId}`).toast('show')
+}
+
+const updateProgress = () => {
+  const now = new Date()
+
+  const secondsUntilNextMinute = (60 - now.getSeconds())
+  const minutesUntilNextHour = (60 - now.getMinutes())
+  const minutesUntilNextLotomania = (5 - (now.getMinutes() % 5))
+  const secondsUntilNextLotomania = 300 - (minutesUntilNextLotomania * 60 + (secondsUntilNextMinute === 60 ? 0 : secondsUntilNextMinute))
+  const hoursUntilNextDay = (24 - now.getHours())
+
+  const megasenaPercentage = (24 - hoursUntilNextDay) / 24 * 100
+  $('#megasena-progress').css('width', `${megasenaPercentage}%`).attr('aria-valuenow', megasenaPercentage);
+  $('#megasena-timer').text(`Próximo sorteio em ${hoursUntilNextDay} horas, ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
+
+  const lotofacilPercentage = (60 - minutesUntilNextHour) / 60 * 100
+  $('#lotofacil-progress').css('width', `${lotofacilPercentage}%`).attr('aria-valuenow', lotofacilPercentage);
+  $('#lotofacil-timer').text(`Próximo sorteio em ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
+
+  const lotomaniaPercentage = (300 - (secondsUntilNextLotomania) / 300 * 100)
+  console.log(lotomaniaPercentage, secondsUntilNextLotomania)
+  $('#lotomania-progress').css('width', `${lotomaniaPercentage}%`).attr('aria-valuenow', lotomaniaPercentage);
+  $('#lotomania-timer').text(`Próximo sorteio em ${minutesUntilNextLotomania} minutos e ${secondsUntilNextMinute} segundos`)
+
+  const rapidinhaPercentage = (60 - secondsUntilNextMinute) / 60 * 100
+  $('#rapidinha-progress').css('width', `${rapidinhaPercentage}%`).attr('aria-valuenow', rapidinhaPercentage);
+  $('#rapidinha-timer').text(`Próximo sorteio em ${secondsUntilNextMinute} segundos`)
+}
+
+setInterval(updateProgress, 1000)
+updateProgress()
+
 const formatCurrency = (amount) => amount.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})
+
+const placeBets = async () => {
+  for (const lottery in bets) {
+    if (bets[lottery].length === raffles[lottery].bets) {
+      const data = JSON.stringify({
+        userId,
+        raffle: raffles[lottery].name,
+        numbers: bets[lottery],
+      })
+
+      console.log(data)
+      const response = await fetch(`http://${location.host}/bet`, {
+        method: 'POST',
+        body: data,
+      })
+
+      if (response.status === 200) {
+        const numbers = bets[lottery].join(', ')
+        showToast('Sucesso', `Você apostou na ${lottery}<br>Seus números: <b>${numbers}</b><br>Boa sorte :)`)
+      }
+    }
+  }
+
+  clearBets()
+}
+
+const clearBets = () => {
+  cart.bets = []
+  bets.megasena = []
+  bets.lotofacil = []
+  bets.lotomania = []
+  bets.rapidinha = []
+  updateCart()
+  cart.total = 0
+  $('#total').text(`Total: ${formatCurrency(cart.total)}`)
+
+  for (const lottery in bets) {
+    $(`[id^=${lottery}-number-]`).each((_, e) => {
+      e.checked = false
+      e.disabled = false
+    })
+  }
+}
 
 const updateCart = () => {
   const cartElement = document.getElementById('cart')
   const totalElement = document.getElementById('total')
+  const finishElement = document.getElementById('finish')
 
   for (const lottery in bets) {
     if (bets[lottery].length === raffles[lottery].bets) {
@@ -95,10 +201,10 @@ const updateCart = () => {
         document.getElementById(`${lottery}-cart`).outerHTML = ''
       }
     }
-
   }
 
   totalElement.innerHTML = `Total: ${formatCurrency(cart.total)}`
+  finishElement.disabled = !cart.bets.length
 }
 
 const updateCheckmarks = (lottery, disable) => {
@@ -166,9 +272,9 @@ const generateLottery = (lottery) => {
       </div>
       <div class="card-footer">
         <div class="progress">
-          <div id="${lottery}-progress" class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: 75%"></div>
+          <div id="${lottery}-progress" class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
         </div>
-        <small><div id="${lottery}-timer" class="text-center">Proximo sorteio em: 5:00</div></small>
+        <small><div id="${lottery}-timer" class="text-center"></div></small>
       </div>
     </div>
     <br>
@@ -179,6 +285,5 @@ const generateLottery = (lottery) => {
 }
 
 for (const lottery in raffles) {
-  console.log(raffles[lottery])
   generateLottery(lottery)
 }

@@ -33,8 +33,10 @@ const sendMessageToClient = (userId, type, content) => {
     }
 }
 
-const sendBetAnnouncementToAllClients = (raffle) => {
+const sendBetAnnouncementToAllClients = (raffle, user) => {
   connections.forEach((client, userId) => {
+    if (userId === user) return
+
     sendMessageToClient(userId, 'bet-made', { raffle })
   })
 }
@@ -71,17 +73,20 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/bet') {
     await req.on('data', (chunk) => {
       const bet = JSON.parse(chunk)
+
       if (isBetInvalid(bet)) {
-        console.log(`${now()} - invalid bet made`)
+        console.log(`${now()} - Invalid bet`)
         res.statusCode = 400
-        return res.end('invalid bet.')
+        return res.end('Invalid bet')
       }
-      console.log(`${now()} - bet made in ${bet.raffle}`)
+
       bets[bet.raffle].push(bet)
-      console.log()
-      sendBetAnnouncementToAllClients(bet.raffle)
+      sendBetAnnouncementToAllClients(bet.raffle, bet.userId)
+
+      console.log(`${now()} - New bet made in lottery "${bet.raffle}". Numbers: ${bet.numbers}`)
+
       res.statusCode = 200
-      return res.end('bet made.')
+      return res.end('Success')
     })
 
   }
@@ -89,7 +94,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/') {
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Length': page.length
+      'Content-Length': page.length,
     })
     res.write(page)
     return res.end()
@@ -98,7 +103,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/client.js') {
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Length': client.length
+      'Content-Length': client.length,
     })
     res.write(client)
     res.end()
@@ -122,14 +127,14 @@ webSocketServer.on('request', (req) => {
   connections.set(connectionId, connection)
   sendMessageToClient(connectionId, 'user-id', { userId: connectionId })
 
-  console.log(`${now()} - ${connection.remoteAddress} connected.`)
+  console.log(`${now()} - ${connection.remoteAddress} connected`)
 
   connection.on('message', (message) => {
     console.log(getContentOfMessage(message))
   })
 
   connection.on('close', () => {
-    console.log(`${now()} - ${connection.remoteAddress} disconnected.`)
+    console.log(`${now()} - ${connection.remoteAddress} disconnected`)
   })
 })
 
@@ -149,15 +154,15 @@ const drawNumbers = ({ range, draws }) => {
 const countBetHits = (draw, bet) => {
   let hits = 0
   for (const n of bet) {
-    if (draw.includes(n)) [
+    if (draw.includes(Number(n))) [
       hits++
     ]
   }
   return hits
 }
 
-const givePrizes = (raffle, draw, bets) => {
-  for (const bet of bets) {
+const givePrizes = (raffle, draw, raffleBets) => {
+  for (const bet of raffleBets) {
     const hits = countBetHits(draw, bet.numbers)
     if (raffle.prize[hits] > 0) {
       console.log(`${now()} - ${bet.userId} - won ${raffle.prize[hits]} (${hits}/${raffle.draws})- ${raffle.name}`)
@@ -174,10 +179,11 @@ const givePrizes = (raffle, draw, bets) => {
 const createRaffle = (raffle) => new CronJob(raffle.interval, function() {
   const draw = drawNumbers(raffle)
   if (!bets[raffle.name] || bets[raffle.name].length < 1) {
-    console.log(`${now()} - no bets in ${raffle.name}`)
+    console.log(`${now()} - No bets made in lottery "${raffle.name}"`)
     return
   }
-  console.log(`${now()} - ${raffle.name} (${bets[raffle.name].length} bets) - ${draw}`)
+
+  console.log(`${now()} - ${raffle.name}: (${bets[raffle.name].length} bets) - ${draw}`)
   givePrizes(raffle, draw, bets[raffle.name])
   bets[raffle.name] = []
 }, null, true, 'America/Sao_Paulo')
