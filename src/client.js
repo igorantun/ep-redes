@@ -90,7 +90,7 @@ const showToast = (title, body) => {
   const toastId = Date.now()
 
   $('#toast-container').append(`
-    <div id="${toastId}" class="toast" data-delay="5000" data-autohide="true">
+    <div id="${toastId}" class="toast" data-delay="5000">
       <div class="toast-header">
         <strong id="toast-header" class="mr-auto">${title}</strong>
         <button type="button" class="ml-2 mb-1 close" data-dismiss="toast">&times;</button>
