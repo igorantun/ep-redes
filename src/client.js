@@ -102,29 +102,40 @@ const showToast = (title, body) => {
   $(`#${toastId}`).toast('show')
 }
 
+const startTime = new Date()
+let megasenaProgress = (startTime.getHours() * 60 * 60) + (startTime.getMinutes() * 60) + startTime.getSeconds()
+let lotofacilProgress = (startTime.getMinutes() * 60) + startTime.getSeconds()
+let lotomaniaProgress = ((startTime.getMinutes() % 5) * 60) + startTime.getSeconds()
+let rapidinhaProgress = startTime.getSeconds()
+
 const updateProgress = () => {
   const now = new Date()
-
   const secondsUntilNextMinute = (60 - now.getSeconds())
   const minutesUntilNextHour = (60 - now.getMinutes())
-  const minutesUntilNextLotomania = (5 - (now.getMinutes() % 5))
-  const secondsUntilNextLotomania = 300 - (minutesUntilNextLotomania * 60 + (secondsUntilNextMinute === 60 ? 0 : secondsUntilNextMinute))
+  const minutesUntilNextLotomania = now.getMinutes() % 5 === 0 ? (5 - (now.getMinutes() % 5)) - 1 : (5 - (now.getMinutes() % 5))
   const hoursUntilNextDay = (24 - now.getHours())
+  megasenaProgress++
+  lotofacilProgress++
+  lotomaniaProgress++
+  rapidinhaProgress++
+  if (megasenaProgress % (60 * 60 * 24) === 0) megasenaProgress = 0
+  if (lotofacilProgress % (60 * 60) === 0) lotofacilProgress = 0
+  if (lotomaniaProgress % (60 * 5) === 0) lotomaniaProgress = 0
+  if (rapidinhaProgress % 60 === 0) rapidinhaProgress = 0
 
-  const megasenaPercentage = (24 - hoursUntilNextDay) / 24 * 100
+  const megasenaPercentage = megasenaProgress / (60 * 60 * 24) * 100
   $('#megasena-progress').css('width', `${megasenaPercentage}%`).attr('aria-valuenow', megasenaPercentage);
   $('#megasena-timer').text(`Próximo sorteio em ${hoursUntilNextDay} horas, ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
 
-  const lotofacilPercentage = (60 - minutesUntilNextHour) / 60 * 100
+  const lotofacilPercentage = lotofacilProgress / (60 * 60) * 100
   $('#lotofacil-progress').css('width', `${lotofacilPercentage}%`).attr('aria-valuenow', lotofacilPercentage);
   $('#lotofacil-timer').text(`Próximo sorteio em ${minutesUntilNextHour} minutos e ${secondsUntilNextMinute} segundos`)
 
-  const lotomaniaPercentage = (300 - (secondsUntilNextLotomania) / 300 * 100)
-  console.log(lotomaniaPercentage, secondsUntilNextLotomania)
+  const lotomaniaPercentage = lotomaniaProgress / (60 * 5) * 100
   $('#lotomania-progress').css('width', `${lotomaniaPercentage}%`).attr('aria-valuenow', lotomaniaPercentage);
   $('#lotomania-timer').text(`Próximo sorteio em ${minutesUntilNextLotomania} minutos e ${secondsUntilNextMinute} segundos`)
 
-  const rapidinhaPercentage = (60 - secondsUntilNextMinute) / 60 * 100
+  const rapidinhaPercentage = rapidinhaProgress / 60 * 100
   $('#rapidinha-progress').css('width', `${rapidinhaPercentage}%`).attr('aria-valuenow', rapidinhaPercentage);
   $('#rapidinha-timer').text(`Próximo sorteio em ${secondsUntilNextMinute} segundos`)
 }
@@ -143,7 +154,6 @@ const placeBets = async () => {
         numbers: bets[lottery],
       })
 
-      console.log(data)
       const response = await fetch(`http://${location.host}/bet`, {
         method: 'POST',
         body: data,
